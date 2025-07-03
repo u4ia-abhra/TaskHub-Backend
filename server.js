@@ -35,9 +35,7 @@ app.use(async (req, res, next) => {
   next();
 });
 
-const testRoutes = require("./routes/test");
 const authRoutes = require("./routes/authRoutes");
-app.use("/api/test", testRoutes);
 app.use("/api/auth", authRoutes);
 
 app.all("*", (req, res, next) => {
