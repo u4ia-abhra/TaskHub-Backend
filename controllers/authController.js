@@ -71,9 +71,7 @@ async function login(req, res) {
   }
 
   try {
-    console.log("Looking for user with email:", normalizedEmail);
     const user = await User.findOne({ email: normalizedEmail });
-    console.log("Found user:", user);
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
