@@ -13,3 +13,4 @@ router.get("/", authMiddleware, taskController.viewTasks);
 // router.put("/edit/:id", authMiddleware, taskController.editTask);
 
 module.exports = router;
+
