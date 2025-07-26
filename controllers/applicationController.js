@@ -85,8 +85,166 @@ async function getApplicationsForTask(req, res) {
   }
 }
 
+async function acceptApplication(req, res) {
+  try {
+    const applicationId = req.params.applicationId;
+    const userId = req.user.id;
+
+    const application = await Application.findById(applicationId).populate("task");
+    if (!application) {
+      return res.status(404).json({ message: "Application not found." });
+    }
+
+    const task = application.task;
+
+    if (!task) {
+      return res.status(404).json({ message: "Associated task not found." });
+    }
+
+    if (task.uploadedBy.toString() !== userId) {
+      return res.status(403).json({ message: "You are not authorized to accept applications for this task." });
+    }
+
+    if (task.status !== "open") {
+      return res.status(400).json({ message: "Cannot accept applications for a non-open task." });
+    }
+
+    if (application.status !== "pending") {
+      return res.status(400).json({ message: "Only pending applications can be accepted." });
+    }
+
+    // Accept this application
+    application.status = "accepted";
+    await application.save();
+
+    // Reject all other applications for this task
+    await Application.updateMany(
+      {
+        task: task._id,
+        _id: { $ne: application._id },
+        status: "pending",
+      },
+      { $set: { status: "rejected" } }
+    );
+
+    // Update task status to "in progress"
+    task.status = "in progress";
+    await task.save();
+
+    res.status(200).json({
+      message: "Application accepted successfully. Task is now in progress.",
+      applicationId: application._id,
+      taskId: task._id,
+    });
+  } catch (error) {
+    console.error("Error accepting application:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+}
+
+async function rejectApplication(req, res) {
+  try {
+    const applicationId = req.params.applicationId;
+    const userId = req.user.id;
+
+    const application = await Application.findById(applicationId).populate("task");
+    if (!application) {
+      return res.status(404).json({ message: "Application not found." });
+    }
+
+    const task = application.task;
+
+    if (!task) {
+      return res.status(404).json({ message: "Associated task not found." });
+    }
+
+    if (task.uploadedBy.toString() !== userId) {
+      return res.status(403).json({ message: "You are not authorized to reject applications for this task." });
+    }
+
+    if (task.status !== "open") {
+      return res.status(400).json({ message: "Cannot reject applications for a non-open task." });
+    }
+
+    if (application.status !== "pending") {
+      return res.status(400).json({ message: "Only pending applications can be rejected." });
+    }
+
+    application.status = "rejected";
+    await application.save();
+
+    res.status(200).json({
+      message: "Application rejected successfully.",
+      applicationId: application._id,
+    });
+  } catch (error) {
+    console.error("Error rejecting application:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+}
+
+async function getMyApplications(req, res) {
+  try {
+    const userId = req.user.id;
+
+    const applications = await Application.find({ applicant: userId })
+      .populate("task", "title category deadline status")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      message: "Your applications fetched successfully.",
+      applications,
+    });
+  } catch (error) {
+    console.error("Error fetching user applications:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+}
+
+async function withdrawApplication(req, res) {
+  try {
+    const applicationId = req.params.applicationId;
+    const userId = req.user.id;
+
+    const application = await Application.findById(applicationId).populate("task");
+    if (!application) {
+      return res.status(404).json({ message: "Application not found." });
+    }
+
+    if (application.applicant.toString() !== userId) {
+      return res.status(403).json({ message: "You are not authorized to withdraw this application." });
+    }
+
+    const task = application.task;
+    if (!task) {
+      return res.status(404).json({ message: "Associated task not found." });
+    }
+
+    if (task.status !== "open") {
+      return res.status(400).json({ message: "Cannot withdraw application for a task that is no longer open." });
+    }
+
+    if (application.status !== "pending") {
+      return res.status(400).json({ message: "Only pending applications can be withdrawn." });
+    }
+
+    await application.deleteOne();
+
+    res.status(200).json({
+      message: "Application withdrawn successfully.",
+      applicationId: application._id,
+    });
+  } catch (error) {
+    console.error("Error withdrawing application:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+}
+
 module.exports = {
   applyForTask,
   getApplicationsForTask,
-  
+  acceptApplication,
+  rejectApplication,
+  getMyApplications,
+  withdrawApplication,
 };
