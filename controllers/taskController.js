@@ -1,9 +1,16 @@
 const Task = require("../models/task");
+const fs = require("fs");
+const path = require("path");
 
 async function uploadTask(req, res) {
   try {
     const { title, description, category, deadline, budget } = req.body;
     const uploadedBy = req.user?.id;
+
+    const files = req.files || [];
+    const attachmentPaths = files.map(
+      (file) => `/uploads/tasks/${file.filename}`
+    );
 
     const parsedDeadline = new Date(deadline);
 
@@ -26,6 +33,7 @@ async function uploadTask(req, res) {
       deadline,
       budget,
       uploadedBy,
+      attachments: attachmentPaths,
     });
 
     await newTask.validate();
@@ -179,6 +187,20 @@ async function deleteTask(req, res) {
         .json({ message: "You are not authorized to delete this task." });
     }
 
+    // Delete attachment files from disk
+    (task.attachments || []).forEach((attPath) => {
+      const filePath = path.join(
+        __dirname,
+        "..",
+        attPath.replace(/^\//, "")
+      );
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.warn("Failed to delete file:", filePath, err.message);
+        }
+      });
+    });
+
     await task.deleteOne();
 
     res.status(200).json({ message: "Task deleted successfully." });
@@ -194,8 +216,18 @@ async function editTask(req, res) {
     const userId = req.user.id;
     const { title, description, category, deadline, budget } = req.body;
 
-    if (!title || !description || !category || !deadline || budget === undefined) {
-      return res.status(400).json({ message: "All fields (title, description, category, deadline, budget) are required." });
+    // Basic field validation
+    if (
+      !title ||
+      !description ||
+      !category ||
+      !deadline ||
+      budget === undefined
+    ) {
+      return res.status(400).json({
+        message:
+          "All fields (title, description, category, deadline, budget) are required.",
+      });
     }
 
     const task = await Task.findById(taskId);
@@ -204,19 +236,71 @@ async function editTask(req, res) {
     }
 
     if (task.uploadedBy.toString() !== userId) {
-      return res.status(403).json({ message: "You are not authorized to edit this task." });
+      return res
+        .status(403)
+        .json({ message: "You are not authorized to edit this task." });
     }
 
     if (task.status !== "open") {
-      return res.status(400).json({ message: "Only tasks with 'open' status can be edited." });
+      return res
+        .status(400)
+        .json({ message: "Only tasks with 'open' status can be edited." });
     }
 
-    // Apply changes
+    // ---- Attachments handling starts here ----
+
+    // 1) New uploaded files (if any)
+    const newFiles = req.files || [];
+    const newAttachmentPaths = newFiles.map(
+      (file) => `/uploads/tasks/${file.filename}`
+    );
+
+    // 2) Existing attachments to keep (sent from frontend)
+    //    expected as JSON string: '["/uploads/tasks/a.pdf","/uploads/tasks/b.png"]'
+    let existingAttachmentsToKeep = task.attachments || [];
+
+    if (req.body.existingAttachments) {
+      try {
+        existingAttachmentsToKeep = JSON.parse(req.body.existingAttachments);
+        if (!Array.isArray(existingAttachmentsToKeep)) {
+          existingAttachmentsToKeep = [];
+        }
+      } catch (e) {
+        console.warn("Failed to parse existingAttachments, defaulting to []");
+        existingAttachmentsToKeep = [];
+      }
+    }
+
+    // 3) Determine which old attachments are being removed
+    const attachmentsRemoved = (task.attachments || []).filter(
+      (att) => !existingAttachmentsToKeep.includes(att)
+    );
+
+    // 4) Delete removed files from disk
+    attachmentsRemoved.forEach((attPath) => {
+      const filePath = path.join(
+        __dirname,
+        "..",
+        attPath.replace(/^\//, "") // remove leading "/" so join works properly
+      );
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.warn("Failed to delete file:", filePath, err.message);
+        }
+      });
+    });
+
+    // 5) Final attachments = kept old ones + new ones
+    const finalAttachments = [...existingAttachmentsToKeep, ...newAttachmentPaths];
+
+    // ---- Attachments handling ends here ----
+
     task.title = title.trim();
     task.description = description.trim();
     task.category = category;
     task.deadline = deadline;
     task.budget = budget;
+    task.attachments = finalAttachments;
 
     await task.save();
 

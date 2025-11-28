@@ -5,15 +5,18 @@ const validateTaskInput = [
     .notEmpty()
     .withMessage("Title is required.")
     .isLength({ min: 1 })
-    .withMessage("Title must be at least 3 characters long."),
+    .withMessage("Title must be at least 3 characters long.")
+    .trim(),
   check("description")
     .notEmpty()
     .withMessage("Description is required.")
+    .trim()
     .isLength({ min: 1 })
     .withMessage("Description must be at least 10 characters long."),
   check("category")
     .notEmpty()
     .withMessage("Category is required.")
+    .trim()
     .isIn([
       "assignment",
       "lab file",
@@ -27,12 +30,14 @@ const validateTaskInput = [
     .withMessage("Deadline is required.")
     .isISO8601()
     .toDate()
+    .trim()
     .withMessage("Deadline must be a valid date (YYYY-MM-DD format)."),
   check("budget")
     .notEmpty()
     .withMessage("Budget is required.")
     .isFloat({ gt: 0 })
-    .withMessage("Budget must be a positive number."),
+    .withMessage("Budget must be a positive number.")
+    .trim(),
 
   // Middleware to catch validation errors
   (req, res, next) => {

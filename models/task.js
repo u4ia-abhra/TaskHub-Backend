@@ -42,6 +42,10 @@ const TaskSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    attachments: {
+      type: [String], // array of file URLs or paths
+      required: false,
+    },
   },
   { timestamps: true }
 );

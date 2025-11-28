@@ -40,6 +40,9 @@ app.use(async (req, res, next) => {
   next();
 });
 
+const path = require("path");
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 const authRoutes = require("./routes/authRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
