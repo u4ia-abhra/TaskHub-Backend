@@ -188,44 +188,87 @@ async function deleteTask(req, res) {
   }
 }
 
-async function editTask(req, res) {
+async function editTask (req, res) {
   try {
     const taskId = req.params.id;
     const userId = req.user.id;
+
+    // After validateTaskUpdate, these are already trimmed / converted
     const { title, description, category, deadline, budget } = req.body;
 
-    if (!title || !description || !category || !deadline || budget === undefined) {
-      return res.status(400).json({ message: "All fields (title, description, category, deadline, budget) are required." });
-    }
-
+    // Find task
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({ message: "Task not found." });
     }
 
+    // Ownership check
     if (task.uploadedBy.toString() !== userId) {
-      return res.status(403).json({ message: "You are not authorized to edit this task." });
+      return res
+        .status(403)
+        .json({ message: "You are not authorized to edit this task." });
     }
 
+    // Only open tasks can be edited
     if (task.status !== "open") {
-      return res.status(400).json({ message: "Only tasks with 'open' status can be edited." });
+      return res.status(400).json({
+        message: "Only tasks with status 'open' can be edited.",
+      });
     }
 
-    // Apply changes
+    // Enforce unique (title + deadline) per user, excluding current task
+    const existingTask = await Task.findOne({
+      _id: { $ne: taskId },
+      uploadedBy: userId,
+      title: title.trim(),
+      deadline: deadline instanceof Date ? deadline : new Date(deadline),
+    });
+
+    if (existingTask) {
+      return res.status(400).json({
+        message:
+          "You already have a task with the same title and deadline. Please choose a different title or deadline.",
+      });
+    }
+
+    // Apply updates
     task.title = title.trim();
     task.description = description.trim();
     task.category = category;
-    task.deadline = deadline;
+    task.deadline =
+      deadline instanceof Date ? deadline : new Date(deadline);
     task.budget = budget;
 
+    // Double-check Mongoose validation (schema-level)
+    await task.validate();
     await task.save();
 
-    res.status(200).json({ message: "Task updated successfully.", task });
+    return res.status(200).json({
+      message: "Task updated successfully.",
+      task,
+    });
   } catch (error) {
     console.error("Error editing task:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+
+    // Handle Mongoose validation errors nicely
+    if (error.name === "ValidationError") {
+      const errors = Object.values(error.errors).map((err) => ({
+        field: err.path,
+        message: err.message,
+      }));
+
+      return res.status(400).json({
+        message: "Validation failed.",
+        errors,
+      });
+    }
+
+    return res.status(500).json({
+      message: "An error occurred while editing the task.",
+      error: error.message,
+    });
   }
-}
+};
 
 module.exports = {
   uploadTask,

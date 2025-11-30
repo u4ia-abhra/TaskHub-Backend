@@ -1,38 +1,36 @@
 const { check, validationResult } = require("express-validator");
 
-const validateTaskInput = [
-  check("title")
-    .notEmpty()
-    .withMessage("Title is required.")
-    .isLength({ min: 1 })
-    .withMessage("Title must be at least 3 characters long."),
-  check("description")
-    .notEmpty()
-    .withMessage("Description is required.")
-    .isLength({ min: 1 })
-    .withMessage("Description must be at least 10 characters long."),
-  check("category")
-    .notEmpty()
-    .withMessage("Category is required.")
-    .isIn([
+allowedCategories = [
       "assignment",
       "lab file",
       "workshop file",
       "presentation slide",
       "other",
-    ])
+    ];
+
+const validateTaskInput = [
+  check("title")
+    .notEmpty()
+    .withMessage("Title is required."),
+  check("description")
+    .notEmpty()
+    .withMessage("Description is required."),
+  check("category")
+    .notEmpty()
+    .withMessage("Category is required.")
+    .isIn(allowedCategories)
     .withMessage("Invalid category."),
   check("deadline")
     .notEmpty()
     .withMessage("Deadline is required.")
     .isISO8601()
-    .toDate()
-    .withMessage("Deadline must be a valid date (YYYY-MM-DD format)."),
+    .withMessage("Deadline must be a valid date (YYYY-MM-DD format).")
+    .toDate(),
   check("budget")
     .notEmpty()
     .withMessage("Budget is required.")
-    .isFloat({ gt: 0 })
-    .withMessage("Budget must be a positive number."),
+    .isFloat({ gt: 10 })
+    .withMessage("Budget must be at least 10."),
 
   // Middleware to catch validation errors
   (req, res, next) => {
@@ -44,4 +42,39 @@ const validateTaskInput = [
   },
 ];
 
-module.exports = { validateTaskInput };
+const validateTaskUpdate = [
+  check("title")
+    .notEmpty()
+    .withMessage("Title is required."),
+  check("description")
+    .notEmpty()
+    .withMessage("Description is required."),
+  check("category")
+    .notEmpty()
+    .withMessage("Category is required.")
+    .isIn(allowedCategories)
+    .withMessage("Invalid category."),
+  check("deadline")
+    .notEmpty()
+    .withMessage("Deadline is required.")
+    .isISO8601()
+    .withMessage("Deadline must be a valid date (YYYY-MM-DD format).")
+    .toDate(),
+  check("budget")
+    .notEmpty()
+    .withMessage("Budget is required.")
+    .isFloat({ gt: 10 })
+    .withMessage("Budget must be at least 10."),
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    next();
+  },
+];
+
+module.exports = {
+  validateTaskInput,
+  validateTaskUpdate,
+};
