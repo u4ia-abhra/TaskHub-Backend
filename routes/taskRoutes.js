@@ -2,9 +2,23 @@ const express = require("express");
 const router = express.Router();
 const { authMiddleware } = require("../middleware/authMiddleware");
 const taskController = require("../controllers/taskController");
-const { validateTaskInput,validateTaskUpdate } = require('../middleware/taskValidation'); // Your validation middleware
+const {
+  validateTaskInput,
+  validateTaskUpdate,
+} = require("../middleware/taskValidation"); 
+const { uploadTaskAttachments } = require("../middleware/uploadMiddleware");
+const {
+  processTaskAttachments,
+} = require("../middleware/attachmentsProcessing");
 
-router.post("/upload", authMiddleware, validateTaskInput, taskController.uploadTask);
+router.post(
+  "/upload",
+  authMiddleware,
+  uploadTaskAttachments,
+  processTaskAttachments,
+  validateTaskInput,
+  taskController.uploadTask
+);
 
 router.get("/", taskController.viewTasks);
 
@@ -14,6 +28,13 @@ router.patch("/:id/status", authMiddleware, taskController.updateTaskStatus);
 
 router.delete("/:id", authMiddleware, taskController.deleteTask);
 
-router.put("/edit/:id", authMiddleware, validateTaskUpdate, taskController.editTask);
+router.put(
+  "/edit/:id",
+  authMiddleware,
+    uploadTaskAttachments,
+    processTaskAttachments,
+  validateTaskUpdate,
+  taskController.editTask
+);
 
 module.exports = router;

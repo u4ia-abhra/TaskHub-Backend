@@ -1,11 +1,51 @@
 const mongoose = require("mongoose");
 
-const TaskSchema = new mongoose.Schema(
+const attachmentSchema = new mongoose.Schema(
   {
-    title: { type: String, required: true, trim: true },
-    description: { type: String, required: true, trim: true },
+    url: {
+      type: String,
+      required: true,
+    },
+    publicId: {
+      type: String,
+      required: true, // used to delete from Cloudinary
+    },
+    filename: {
+      type: String,
+      required: true,
+    },
+    mimeType: {
+      type: String,
+      required: true,
+    },
+    size: {
+      type: Number,
+      required: true, // in bytes
+    },
+    resourceType: {
+      type: String, // e.g. "image", "raw", "video"
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: false }
+);
+
+const taskSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+    },
+    description: {
+      type: String,
+      required: true,
+    },
     category: {
       type: String,
+      required: true,
       enum: [
         "assignment",
         "lab file",
@@ -13,8 +53,6 @@ const TaskSchema = new mongoose.Schema(
         "presentation slide",
         "other",
       ],
-      required: true,
-      trim: true,
     },
     deadline: {
       type: Date,
@@ -35,15 +73,19 @@ const TaskSchema = new mongoose.Schema(
       type: String,
       enum: ["open", "in progress", "completed"],
       default: "open",
-      required: true,
     },
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
+    attachments: {
+      type: [attachmentSchema],
+      default: [],
+    },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Task", TaskSchema);
+const Task = mongoose.model("Task", taskSchema);
+module.exports = Task;
