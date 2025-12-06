@@ -1,11 +1,17 @@
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
-
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
+//Routes
+const googleAuthRoutes = require("./routes/googleAuthRoutes");
+const authRoutes = require("./routes/authRoutes");
+const taskRoutes = require("./routes/taskRoutes");
+const applicationRoutes = require("./routes/applicationRoutes");
+
+//setup
 const dbUrl = process.env.MONGODB_URL;
 const app = express();
 
@@ -40,12 +46,11 @@ app.use(async (req, res, next) => {
   next();
 });
 
-const authRoutes = require("./routes/authRoutes");
-const taskRoutes = require("./routes/taskRoutes");
-const applicationRoutes = require("./routes/applicationRoutes");
+// Google OAuth Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/auth", googleAuthRoutes);
 app.use("/api/task", taskRoutes);
-app.use("/api/application", applicationRoutes);
+app.use("/api/applications", applicationRoutes);
 
 app.all("*", (req, res, next) => {
   next(res.status(404).json({ message: "Route not found" }));

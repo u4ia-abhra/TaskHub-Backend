@@ -5,7 +5,7 @@ const UserSchema = new mongoose.Schema(
     // Primary details (To be filled in initial signup)
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
+    password: { type: String, required: false },//password may be null for OAuth users
     role: {
       type: String,
       enum: ["poster", "freelancer", "both"],

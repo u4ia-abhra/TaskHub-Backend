@@ -227,6 +227,93 @@ async function resetPassword(req, res) {
   }
 }
 
+async function getMe (req, res) {
+  try {
+    const user = await User.findById(req.user.id).select(
+      "-password -resetPasswordToken -resetPasswordExpires"
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.status(200).json({ user });
+  } catch (error) {
+    console.error("Error in getMe:", error.message);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+async function updateProfile (req, res) {
+  try {
+    // Only allow these fields to be updated from the profile page
+    const allowedFields = [
+      "name",
+      "phone",
+      "roll",
+      "branch",
+      "bio",
+      "skills",
+      "image",
+      "year",
+      "dob",
+      "linkedin",
+      "github",
+      "instagram",
+      "portfolio",
+    ];
+
+    const updates = {};
+
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    });
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select("-password -resetPasswordToken -resetPasswordExpires");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Profile updated successfully", user });
+  } catch (error) {
+    console.error("Error in updateProfile:", error.message);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const PUBLIC_USER_FIELDS =
+  "name role branch year bio skills image linkedin github instagram portfolio createdAt isVerified isBanned";
+
+async function getPublicProfile(req, res) {
+  const { id } = req.params;
+
+  try {
+    const user = await User.findById(id).select(PUBLIC_USER_FIELDS);
+
+    // hide banned or unverified accounts as "not found"
+    if (!user || user.isBanned || !user.isVerified) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const userObj = user.toObject();
+    delete userObj.isVerified;
+    delete userObj.isBanned;
+
+    res.status(200).json({ user: userObj });
+  } catch (error) {
+    console.error("getPublicProfile error:", error.message);
+    return res.status(400).json({ message: "Invalid user id", error: error.message });
+  }
+}
+
 module.exports = {
   register,
   login,
@@ -234,4 +321,7 @@ module.exports = {
   resendVerificationEmail,
   requestPasswordReset,
   resetPassword,
+  getMe,
+  updateProfile,
+  getPublicProfile
 };
