@@ -24,6 +24,8 @@ router.get("/", taskController.viewTasks);
 
 router.get("/my-tasks", authMiddleware, taskController.getMyTasks);
 
+router.get("/:id", taskController.getTaskById);
+
 router.patch("/:id/status", authMiddleware, taskController.updateTaskStatus);
 
 router.delete("/:id", authMiddleware, taskController.deleteTask);
