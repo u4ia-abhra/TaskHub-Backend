@@ -120,6 +120,35 @@ async function viewTasks(req, res) {
   }
 }
 
+async function getTaskById(req, res) {
+  try {
+    const taskId = req.params.id;
+
+    // Validate taskId format
+    if (!taskId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: "Invalid task ID format." });
+    }
+
+    const task = await Task.findById(taskId)
+      .populate("uploadedBy", "name email");
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found." });
+    }
+
+    res.status(200).json({
+      message: "Task fetched successfully.",
+      task
+    });
+  } catch (error) {
+    console.error("Error fetching task by ID:", error);
+    res.status(500).json({ 
+      message: "Server error", 
+      error: error.message 
+    });
+  }
+}
+
 async function getMyTasks(req, res) {
   try {
     const userId = req.user.id;
@@ -370,6 +399,7 @@ module.exports = {
   uploadTask,
   viewTasks,
   getMyTasks,
+  getTaskById, 
   updateTaskStatus,
   deleteTask,
   editTask,
