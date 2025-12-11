@@ -1,60 +1,65 @@
 const Task = require("../models/task");
+const { deleteFile } = require("../utils/cloudinaryService");
 
 async function uploadTask(req, res) {
   try {
     const { title, description, category, deadline, budget } = req.body;
-    const uploadedBy = req.user?.id;
+    const uploadedBy = req.user.id;
 
     const parsedDeadline = new Date(deadline);
 
+    // Prevent duplicate title + deadline for the same user
     const existingTask = await Task.findOne({
-      title: title,
-      uploadedBy: uploadedBy,
+      title: title.trim(),
+      uploadedBy,
       deadline: parsedDeadline,
     });
 
     if (existingTask) {
-      return res.status(409).json({
-        message: "A task with this title and deadline already exists for you.",
+      return res.status(400).json({
+        message:
+          "You already have a task with the same title and deadline. Please choose a different title or deadline.",
       });
     }
 
     const newTask = new Task({
-      title,
-      description,
+      title: title.trim(),
+      description: description.trim(),
       category,
-      deadline,
+      deadline: parsedDeadline,
       budget,
       uploadedBy,
+      attachments: req.attachments || [], // NEW
     });
 
     await newTask.validate();
     await newTask.save();
 
     return res.status(201).json({
-      status: 201,
-      message: "Task uploaded successfully",
+      message: "Task uploaded successfully.",
+      task: newTask,
     });
   } catch (error) {
     console.error("Error uploading task:", error);
 
     if (error.name === "ValidationError") {
-      const errors = {};
-      for (let field in error.errors) {
-        errors[field] = error.errors[field].message;
-      }
+      const errors = Object.values(error.errors).map((err) => ({
+        field: err.path,
+        message: err.message,
+      }));
+
       return res.status(400).json({
-        message: "Validation failed",
-        errors: errors,
+        message: "Validation failed.",
+        errors,
       });
     }
 
     return res.status(500).json({
-      message: "Server error while uploading task",
+      message: "An error occurred while uploading the task.",
       error: error.message,
     });
   }
-}
+};
 
 async function viewTasks(req, res) {
   try {
@@ -115,6 +120,35 @@ async function viewTasks(req, res) {
   }
 }
 
+async function getTaskById(req, res) {
+  try {
+    const taskId = req.params.id;
+
+    // Validate taskId format
+    if (!taskId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: "Invalid task ID format." });
+    }
+
+    const task = await Task.findById(taskId)
+      .populate("uploadedBy", "name email");
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found." });
+    }
+
+    res.status(200).json({
+      message: "Task fetched successfully.",
+      task
+    });
+  } catch (error) {
+    console.error("Error fetching task by ID:", error);
+    res.status(500).json({ 
+      message: "Server error", 
+      error: error.message 
+    });
+  }
+}
+
 async function getMyTasks(req, res) {
   try {
     const userId = req.user.id;
@@ -168,7 +202,6 @@ async function deleteTask(req, res) {
     const userId = req.user.id;
 
     const task = await Task.findById(taskId);
-
     if (!task) {
       return res.status(404).json({ message: "Task not found." });
     }
@@ -179,22 +212,65 @@ async function deleteTask(req, res) {
         .json({ message: "You are not authorized to delete this task." });
     }
 
+    // Delete attachments from Cloudinary (best-effort)
+    if (task.attachments && task.attachments.length > 0) {
+      for (const attachment of task.attachments) {
+        try {
+          await deleteFile(attachment.publicId, attachment.resourceType);
+        } catch (err) {
+          console.error(
+            `Failed to delete attachment ${attachment.publicId} from Cloudinary:`,
+            err
+          );
+        }
+      }
+    }
+
     await task.deleteOne();
 
-    res.status(200).json({ message: "Task deleted successfully." });
+    return res.status(200).json({ message: "Task deleted successfully." });
   } catch (error) {
     console.error("Error deleting task:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    return res.status(500).json({
+      message: "An error occurred while deleting the task.",
+      error: error.message,
+    });
   }
-}
+};
 
-async function editTask (req, res) {
+async function editTask(req, res) {
   try {
     const taskId = req.params.id;
     const userId = req.user.id;
 
-    // After validateTaskUpdate, these are already trimmed / converted
+    // Text fields (from validateTaskUpdate)
     const { title, description, category, deadline, budget } = req.body;
+
+    // Optional: attachmentsToRemove sent as JSON string in form-data
+    let attachmentsToRemove = [];
+    if (req.body.attachmentsToRemove) {
+      try {
+        const parsed = JSON.parse(req.body.attachmentsToRemove);
+
+        if (!Array.isArray(parsed)) {
+          return res.status(400).json({
+            message:
+              "attachmentsToRemove must be a JSON array of Cloudinary public IDs.",
+          });
+        }
+
+        // Keep only string values
+        attachmentsToRemove = parsed.filter(
+          (id) => typeof id === "string" && id.trim() !== ""
+        );
+      } catch (parseError) {
+        return res.status(400).json({
+          message:
+            "Invalid attachmentsToRemove format. It must be a valid JSON array of strings.",
+          error: parseError.message,
+        });
+      }
+    }
 
     // Find task
     const task = await Task.findById(taskId);
@@ -216,12 +292,15 @@ async function editTask (req, res) {
       });
     }
 
-    // Enforce unique (title + deadline) per user, excluding current task
+    const parsedDeadline =
+      deadline instanceof Date ? deadline : new Date(deadline);
+
+    // Optional: uniqueness check on title + deadline for this user (excluding current task)
     const existingTask = await Task.findOne({
       _id: { $ne: taskId },
       uploadedBy: userId,
       title: title.trim(),
-      deadline: deadline instanceof Date ? deadline : new Date(deadline),
+      deadline: parsedDeadline,
     });
 
     if (existingTask) {
@@ -231,15 +310,62 @@ async function editTask (req, res) {
       });
     }
 
-    // Apply updates
+    // 1) Handle removal of existing attachments (if any)
+    if (attachmentsToRemove.length > 0 && task.attachments.length > 0) {
+      const idsToRemoveSet = new Set(attachmentsToRemove);
+
+      const attachmentsToKeep = [];
+      const attachmentsToDelete = [];
+
+      for (const att of task.attachments) {
+        if (idsToRemoveSet.has(att.publicId)) {
+          attachmentsToDelete.push(att);
+        } else {
+          attachmentsToKeep.push(att);
+        }
+      }
+
+      // Delete from Cloudinary (best-effort)
+      for (const att of attachmentsToDelete) {
+        try {
+          await deleteFile(att.publicId, att.resourceType || "raw");
+        } catch (err) {
+          console.error(
+            `Failed to delete attachment ${att.publicId} from Cloudinary:`,
+            err
+          );
+          // We don't fail the whole request here; just log the error.
+        }
+      }
+
+      // Keep only non-removed attachments in the task document
+      task.attachments = attachmentsToKeep;
+    }
+
+    // 2) Handle new attachments (files uploaded in this request)
+    const newAttachments = req.attachments || [];
+
+    if (newAttachments.length > 0) {
+      const totalAttachments = task.attachments.length + newAttachments.length;
+
+      if (totalAttachments > 5) {
+        return res.status(400).json({
+          message:
+            "You can have a maximum of 5 attachments per task. Remove some existing attachments before adding more.",
+        });
+      }
+
+      task.attachments.push(...newAttachments);
+    }
+
+    // 3) Update basic fields
     task.title = title.trim();
     task.description = description.trim();
     task.category = category;
-    task.deadline =
-      deadline instanceof Date ? deadline : new Date(deadline);
+    task.deadline = parsedDeadline;
     task.budget = budget;
 
-    // Double-check Mongoose validation (schema-level)
+    // Validate and save
     await task.validate();
     await task.save();
 
@@ -250,7 +376,6 @@ async function editTask (req, res) {
   } catch (error) {
     console.error("Error editing task:", error);
 
-    // Handle Mongoose validation errors nicely
     if (error.name === "ValidationError") {
       const errors = Object.values(error.errors).map((err) => ({
         field: err.path,
@@ -274,6 +399,7 @@ module.exports = {
   uploadTask,
   viewTasks,
   getMyTasks,
+  getTaskById, 
   updateTaskStatus,
   deleteTask,
   editTask,
