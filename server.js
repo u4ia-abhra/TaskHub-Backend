@@ -4,6 +4,11 @@ if (process.env.NODE_ENV !== "production") {
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const paymentRoutes = require("./routes/paymentRoutes");
+
+//Payment
+const razorpay = require("./utils/razorpay");
+
 
 //Routes
 const googleAuthRoutes = require("./routes/googleAuthRoutes");
@@ -58,6 +63,9 @@ app.use("/api/reviews", reviewRoutes);
 app.all("*", (req, res, next) => {
   next(res.status(404).json({ message: "Route not found" }));
 });
+
+//payment routes
+app.use("/api/payment", paymentRoutes);
 
 module.exports = app;
 
