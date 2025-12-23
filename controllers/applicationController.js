@@ -1,5 +1,6 @@
 const Application = require("../models/application");
 const Task = require("../models/task");
+const Conversation = require("../models/conversation");
 
 async function applyForTask(req, res) {
   try {
@@ -20,7 +21,9 @@ async function applyForTask(req, res) {
     }
 
     if (task.status !== "open") {
-      return res.status(400).json({ message: "Applications are closed for this task." });
+      return res
+        .status(400)
+        .json({ message: "Applications are closed for this task." });
     }
 
     if (task.uploadedBy.toString() === userId) {
@@ -68,7 +71,11 @@ async function getApplicationsForTask(req, res) {
     }
 
     if (task.uploadedBy.toString() !== userId) {
-      return res.status(403).json({ message: "You are not authorized to view applications for this task." });
+      return res
+        .status(403)
+        .json({
+          message: "You are not authorized to view applications for this task.",
+        });
     }
 
     const applications = await Application.find({ task: taskId })
@@ -90,7 +97,8 @@ async function acceptApplication(req, res) {
     const applicationId = req.params.applicationId;
     const userId = req.user.id;
 
-    const application = await Application.findById(applicationId).populate("task");
+    const application =
+      await Application.findById(applicationId).populate("task");
     if (!application) {
       return res.status(404).json({ message: "Application not found." });
     }
@@ -102,15 +110,24 @@ async function acceptApplication(req, res) {
     }
 
     if (task.uploadedBy.toString() !== userId) {
-      return res.status(403).json({ message: "You are not authorized to accept applications for this task." });
+      return res
+        .status(403)
+        .json({
+          message:
+            "You are not authorized to accept applications for this task.",
+        });
     }
 
     if (task.status !== "open") {
-      return res.status(400).json({ message: "Cannot accept applications for a non-open task." });
+      return res
+        .status(400)
+        .json({ message: "Cannot accept applications for a non-open task." });
     }
 
     if (application.status !== "pending") {
-      return res.status(400).json({ message: "Only pending applications can be accepted." });
+      return res
+        .status(400)
+        .json({ message: "Only pending applications can be accepted." });
     }
 
     // Accept this application
@@ -129,7 +146,23 @@ async function acceptApplication(req, res) {
 
     // Update task status to "in progress"
     task.status = "in progress";
+    task.assignedTo = application.applicant;
     await task.save();
+    
+    // Create a conversation between task uploader and applicant
+    const existingConv = await Conversation.findOne({
+      task: task._id,
+      application: application._id,
+    });
+
+    if (!existingConv) {
+      await Conversation.create({
+        task: task._id,
+        application: application._id,
+        participants: [task.uploadedBy, application.applicant],
+        status: "active",
+      });
+    }
 
     res.status(200).json({
       message: "Application accepted successfully. Task is now in progress.",
@@ -147,7 +180,8 @@ async function rejectApplication(req, res) {
     const applicationId = req.params.applicationId;
     const userId = req.user.id;
 
-    const application = await Application.findById(applicationId).populate("task");
+    const application =
+      await Application.findById(applicationId).populate("task");
     if (!application) {
       return res.status(404).json({ message: "Application not found." });
     }
@@ -159,15 +193,24 @@ async function rejectApplication(req, res) {
     }
 
     if (task.uploadedBy.toString() !== userId) {
-      return res.status(403).json({ message: "You are not authorized to reject applications for this task." });
+      return res
+        .status(403)
+        .json({
+          message:
+            "You are not authorized to reject applications for this task.",
+        });
     }
 
     if (task.status !== "open") {
-      return res.status(400).json({ message: "Cannot reject applications for a non-open task." });
+      return res
+        .status(400)
+        .json({ message: "Cannot reject applications for a non-open task." });
     }
 
     if (application.status !== "pending") {
-      return res.status(400).json({ message: "Only pending applications can be rejected." });
+      return res
+        .status(400)
+        .json({ message: "Only pending applications can be rejected." });
     }
 
     application.status = "rejected";
@@ -206,13 +249,18 @@ async function withdrawApplication(req, res) {
     const applicationId = req.params.applicationId;
     const userId = req.user.id;
 
-    const application = await Application.findById(applicationId).populate("task");
+    const application =
+      await Application.findById(applicationId).populate("task");
     if (!application) {
       return res.status(404).json({ message: "Application not found." });
     }
 
     if (application.applicant.toString() !== userId) {
-      return res.status(403).json({ message: "You are not authorized to withdraw this application." });
+      return res
+        .status(403)
+        .json({
+          message: "You are not authorized to withdraw this application.",
+        });
     }
 
     const task = application.task;
@@ -221,11 +269,18 @@ async function withdrawApplication(req, res) {
     }
 
     if (task.status !== "open") {
-      return res.status(400).json({ message: "Cannot withdraw application for a task that is no longer open." });
+      return res
+        .status(400)
+        .json({
+          message:
+            "Cannot withdraw application for a task that is no longer open.",
+        });
     }
 
     if (application.status !== "pending") {
-      return res.status(400).json({ message: "Only pending applications can be withdrawn." });
+      return res
+        .status(400)
+        .json({ message: "Only pending applications can be withdrawn." });
     }
 
     await application.deleteOne();

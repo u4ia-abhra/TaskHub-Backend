@@ -290,7 +290,7 @@ async function updateProfile (req, res) {
 };
 
 const PUBLIC_USER_FIELDS =
-  "name role branch year bio skills image linkedin github instagram portfolio createdAt isVerified isBanned";
+  "name role branch year bio skills image linkedin github instagram portfolio createdAt isVerified isBanned avgRating totalReviews";
 
 async function getPublicProfile(req, res) {
   const { id } = req.params;

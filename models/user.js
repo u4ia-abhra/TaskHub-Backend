@@ -9,7 +9,7 @@ const UserSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: ["poster", "freelancer", "both"],
-      required: true,
+      required: false,
     },
 
     // About (To be filled from Profile page)
@@ -34,6 +34,19 @@ const UserSchema = new mongoose.Schema(
     verificationExpires: { type: Date, required: false },
     resetPasswordToken: { type: String, required: false },
     resetPasswordExpires: { type: Date, required: false },
+
+    //Rating System
+    avgRating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    totalReviews: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { timestamps: true }
 );
