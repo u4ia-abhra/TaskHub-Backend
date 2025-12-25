@@ -42,7 +42,11 @@ const submissionSchema = new mongoose.Schema(
       type: [attachmentSchema],
       default: [],
     },
-
+    revisionMessage: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+    },
     status: {
       type: String,
       enum: ["submitted", "revision_requested", "accepted"],
@@ -57,9 +61,6 @@ const submissionSchema = new mongoose.Schema(
  * Prevent duplicate version numbers for the same task
  * (v1, v2, v3 … must be unique per task)
  */
-submissionSchema.index(
-  { task: 1, version: 1 },
-  { unique: true }
-);
+submissionSchema.index({ task: 1, version: 1 }, { unique: true });
 
 module.exports = mongoose.model("Submission", submissionSchema);

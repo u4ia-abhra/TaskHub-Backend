@@ -13,7 +13,20 @@ async function createSubmission(req, res) {
       return res.status(404).json({ message: "Task not found." });
     }
 
-    if (task.status !== "in_progress") {
+    if (task.status === "revision_limit_reached") {
+      return res.status(403).json({
+        message: "Revision limit reached. Awaiting uploader's final decision.",
+      });
+    }
+
+    if (task.status === "submitted") {
+      return res.status(403).json({
+        message:
+          "Please wait for the uploader to review the current submission.",
+      });
+    }
+
+    if (task.status !== "in progress") {
       return res.status(400).json({
         message: "Submissions are allowed only when task is in progress.",
       });
@@ -25,9 +38,13 @@ async function createSubmission(req, res) {
       });
     }
 
-    if ((!message || message.trim() === "") && (!req.files || req.files.length === 0)) {
+    if (
+      (!message || message.trim() === "") &&
+      (!req.files || req.files.length === 0)
+    ) {
       return res.status(400).json({
-        message: "Submission must contain a message or at least one attachment.",
+        message:
+          "Submission must contain a message or at least one attachment.",
       });
     }
 
@@ -155,13 +172,14 @@ async function requestRevision(req, res) {
   try {
     const userId = req.user.id;
     const { id } = req.params;
+    const { message } = req.body;
 
     const submission = await Submission.findById(id).populate("task");
     if (!submission) {
       return res.status(404).json({ message: "Submission not found." });
     }
 
-    const task = submission.task;
+    const task = submission.task;    
 
     if (task.uploadedBy.toString() !== userId) {
       return res.status(403).json({
@@ -169,14 +187,47 @@ async function requestRevision(req, res) {
       });
     }
 
-    submission.status = "revision_requested";
-    await submission.save();
+    // Revision limit reached
+    if (task.revisionRequestsUsed >= task.maxRevisionRequests) {
+      return res.status(403).json({
+        message:
+          "Maximum revision requests reached. Please accept the submission or raise a dispute.",
+      });
+    }
+    
+    // Revision can be requested only when task is in 'submitted' state
+    if (task.status !== "submitted") {
+      return res.status(400).json({
+        message:
+          "Revision can be requested only when the task is in submitted state.",
+      });
+    }
 
-    task.status = "in_progress";
+    // Increment revision count
+    task.revisionRequestsUsed += 1;
+
+    // Check if this was the LAST allowed revision
+    if (task.revisionRequestsUsed >= task.maxRevisionRequests) {
+      task.status = "revision_limit_reached";
+    } else {
+      task.status = "in progress";
+    }
+
+    submission.status = "revision_requested";
+
+    if (message && message.trim() !== "") {
+      submission.revisionMessage = message.trim();
+    }
+
+    await submission.save();
     await task.save();
 
     res.status(200).json({
-      message: "Revision requested. Task moved back to in progress.",
+      message: "Revision requested successfully.",
+      revisionMessage: submission.revisionMessage,
+      revisionsUsed: task.revisionRequestsUsed,
+      revisionsRemaining: task.maxRevisionRequests - task.revisionRequestsUsed,
+      taskStatus: task.status,
     });
   } catch (error) {
     console.error("Request revision error:", error);

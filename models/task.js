@@ -75,7 +75,7 @@ const taskSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["open", "in progress", "completed"],
+      enum: ["open", "in progress", "completed", "submitted", "revision_limit_reached"],
       default: "open",
     },
     uploadedBy: {
@@ -86,6 +86,14 @@ const taskSchema = new mongoose.Schema(
     attachments: {
       type: [attachmentSchema],
       default: [],
+    },
+    revisionRequestsUsed: {
+      type: Number,
+      default: 0,
+    },
+    maxRevisionRequests: {
+      type: Number,
+      default: 3,
     },
   },
   { timestamps: true }

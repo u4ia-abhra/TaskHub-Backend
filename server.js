@@ -57,7 +57,7 @@ app.use("/api/applications", applicationRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/profile", profileRoutes);
-app.use("/api/submission", submissionRoutes);
+app.use("/api/submissions", submissionRoutes);
 
 app.all("*", (req, res, next) => {
   next(res.status(404).json({ message: "Route not found" }));
