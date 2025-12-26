@@ -33,6 +33,24 @@ const attachmentSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const paymentSchema = new mongoose.Schema(
+  {
+    orderId: String,
+    paymentId: String,
+    amount: Number, // in paise OR rupees? we'll store in INR rupees (number) and paise when interacting with Razorpay
+    platformFeePercent: Number,
+    platformFeeAmount: Number, // in rupees
+    razorpayFee: Number, // in rupees (if available)
+    netPayoutAmount: Number, // in rupees
+    paidAt: Date,
+    payoutId: String,
+    payoutDone: { type: Boolean, default: false },
+    chatEnabled: { type: Boolean, default: false },
+    pendingAssignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // set at order creation so webhook can assign
+  },
+  { _id: false }
+);
+
 const taskSchema = new mongoose.Schema(
   {
     title: {
@@ -75,7 +93,13 @@ const taskSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["open", "in progress", "completed", "submitted", "revision_limit_reached"],
+      enum: [
+        "open",
+        "in progress",
+        "completed",
+        "submitted",
+        "revision_limit_reached",
+      ],
       default: "open",
     },
     uploadedBy: {
@@ -95,6 +119,11 @@ const taskSchema = new mongoose.Schema(
       type: Number,
       default: 3,
     },
+    payment: paymentSchema,
+
+    // to track submissions timestamps for auto-payout logic
+    firstSubmissionAt: Date,
+    revisionCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

@@ -1,9 +1,10 @@
-const express = require("express");
+// routes/paymentRoutes.js
+const express = require('express');
 const router = express.Router();
-const { authMiddleware } = require("../middleware/authMiddleware");
-const paymentController = require("../controllers/paymentController");
+const paymentController = require('../controllers/paymentController');
+const { authMiddleware } = require('../middleware/authMiddleware'); // your auth
 
-router.post("/create-order", authMiddleware, paymentController.createPaymentOrder);
-router.post("/verify", authMiddleware, paymentController.verifyPayment);
+// Create an order (uploader selects freelancer & requests payment order)
+router.post('/create-order', authMiddleware, paymentController.createOrderForTask);
 
 module.exports = router;

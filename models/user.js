@@ -1,11 +1,20 @@
 const mongoose = require("mongoose");
 
+const payoutSchema = new mongoose.Schema(
+  {
+    upiId: { type: String }, // user supplied UPI ID
+    razorpay_contact_id: { type: String },
+    razorpay_fund_account_id: { type: String },
+  },
+  { _id: false }
+);
+
 const UserSchema = new mongoose.Schema(
   {
     // Primary details (To be filled in initial signup)
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true },
-    password: { type: String, required: false },//password may be null for OAuth users
+    password: { type: String, required: false }, //password may be null for OAuth users
     role: {
       type: String,
       enum: ["poster", "freelancer", "both"],
@@ -19,7 +28,7 @@ const UserSchema = new mongoose.Schema(
     bio: { type: String, required: false },
     skills: { type: [String], required: false },
     image: { type: String, required: false },
-    imagePublicId: { type: String, required: false},
+    imagePublicId: { type: String, required: false },
     year: { type: String, required: false },
     dob: { type: Date, required: false },
 
@@ -48,6 +57,7 @@ const UserSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    payout: payoutSchema,
   },
   { timestamps: true }
 );

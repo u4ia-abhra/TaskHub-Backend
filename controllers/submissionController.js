@@ -1,6 +1,7 @@
 const Submission = require("../models/submission");
 const Task = require("../models/task");
 const { uploadFile, deleteFile } = require("../utils/cloudinaryService");
+const { payoutToFreelancer } = require("../services/payoutService");
 
 async function createSubmission(req, res) {
   try {
@@ -142,7 +143,7 @@ async function acceptSubmission(req, res) {
       return res.status(404).json({ message: "Submission not found." });
     }
 
-    const task = submission.task;
+    const task = await Task.findById(submission.task._id);
 
     if (task.uploadedBy.toString() !== userId) {
       return res.status(403).json({
@@ -150,14 +151,40 @@ async function acceptSubmission(req, res) {
       });
     }
 
+    // 🚫 SAFETY: prevent double acceptance
+    if (submission.status === "accepted") {
+      return res.status(400).json({
+        message: "This submission is already accepted.",
+      });
+    }
+
+    // 1️⃣ Accept submission
     submission.status = "accepted";
     await submission.save();
 
+    // 2️⃣ Mark task completed (MANDATORY before payout)
     task.status = "completed";
     await task.save();
 
-    res.status(200).json({
-      message: "Submission accepted. Task marked as completed.",
+    // 3️⃣ 🔥 TRIGGER PAYOUT (ONLY PLACE)
+    try {
+      await payoutToFreelancer({
+        taskId: task._id,
+        triggeredBy: "accept",
+      });
+    } catch (payoutError) {
+      /**
+       * IMPORTANT:
+       * - Do NOT rollback acceptance
+       * - Money safety > UX
+       * - This can be retried manually / via admin / cron
+       */
+      console.error("Payout failed after submission acceptance:", payoutError);
+    }
+
+    return res.status(200).json({
+      message:
+        "Submission accepted. Task completed and payout process initiated.",
     });
   } catch (error) {
     console.error("Accept submission error:", error);
@@ -179,7 +206,7 @@ async function requestRevision(req, res) {
       return res.status(404).json({ message: "Submission not found." });
     }
 
-    const task = submission.task;    
+    const task = submission.task;
 
     if (task.uploadedBy.toString() !== userId) {
       return res.status(403).json({
@@ -194,7 +221,7 @@ async function requestRevision(req, res) {
           "Maximum revision requests reached. Please accept the submission or raise a dispute.",
       });
     }
-    
+
     // Revision can be requested only when task is in 'submitted' state
     if (task.status !== "submitted") {
       return res.status(400).json({

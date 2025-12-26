@@ -4,10 +4,7 @@ if (process.env.NODE_ENV !== "production") {
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const paymentRoutes = require("./routes/paymentRoutes");
 
-//Payment
-const razorpay = require("./utils/razorpay");
 
 
 //Routes
@@ -19,6 +16,10 @@ const chatRoutes = require("./routes/chatRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const submissionRoutes = require("./routes/submissionRoutes");
+const paymentRoutes = require('./routes/paymentRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
+const startAutoPayoutJob = require('./jobs/autoPayoutJob');
+
 
 //setup
 const dbUrl = process.env.MONGODB_URL;
@@ -30,6 +31,7 @@ const connectToDB = async () => {
   if (isConnected) {
     console.log("Using existing database connection");
     return;
+
   }
   try {
     await mongoose.connect(dbUrl);
@@ -40,6 +42,12 @@ const connectToDB = async () => {
     isConnected = false;
   }
 };
+//test
+app.get("/ping", (req, res) => {
+  res.send("pong");
+});
+
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -55,6 +63,7 @@ app.use(async (req, res, next) => {
   next();
 });
 
+
 app.use("/api/auth", authRoutes);
 app.use("/api/auth", googleAuthRoutes);
 app.use("/api/task", taskRoutes);
@@ -64,12 +73,18 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/submissions", submissionRoutes);
 
+// Mount payment routes (regular JSON)
+app.use('/api/payments', paymentRoutes);
+// For webhook we mount the webhook route separately so it uses express.raw
+app.use('/api/webhooks', webhookRoutes);
+// start cron job (node-cron). If deploying to Vercel, replace job with Vercel scheduled function separately.
+startAutoPayoutJob();
+
 app.all("*", (req, res, next) => {
   next(res.status(404).json({ message: "Route not found" }));
 });
 
-//payment routes
-app.use("/api/payment", paymentRoutes);
+
 
 module.exports = app;
 
