@@ -42,7 +42,7 @@ app.use(cors({
   origin: [
     "http://localhost:5173",                    
     "https://task-hub-frontend-three.vercel.app",
-    "https://taskhub.digital/"
+    "https://taskhub.digital"
   ]
 }));
 
