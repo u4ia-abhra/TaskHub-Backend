@@ -13,7 +13,7 @@ async function sendTaskSubmissionEmail({
 
   try {
     await resend.emails.send({
-      from: "TaskHub@taskhub.digital",
+      from: "noreply@taskhub.digital",
       to: uploaderEmail,
       subject: `New submission received for ${taskTitle}`,
       html: `

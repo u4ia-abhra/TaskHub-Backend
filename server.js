@@ -17,6 +17,7 @@ const reviewRoutes = require("./routes/reviewRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const submissionRoutes = require("./routes/submissionRoutes");
 <<<<<<< HEAD
+<<<<<<< HEAD
 const paymentRoutes = require('./routes/paymentRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const startAutoPayoutJob = require('./jobs/autoPayoutJob');
@@ -24,6 +25,8 @@ const startAutoPayoutJob = require('./jobs/autoPayoutJob');
 =======
 const cronRoutes = require("./routes/cronRoutes");
 >>>>>>> d257f888a28129766cc416b5985e3b8f03df7446
+=======
+>>>>>>> 50fa8d5 (Revert "Deadline reminder service created")
 
 //setup
 const dbUrl = process.env.MONGODB_URL;
@@ -77,7 +80,6 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/submissions", submissionRoutes);
-app.use("/api/cron", cronRoutes);
 
 // Mount payment routes (regular JSON)
 app.use('/api/payments', paymentRoutes);
