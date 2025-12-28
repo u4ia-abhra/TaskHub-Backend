@@ -1,88 +1,134 @@
 // services/razorpayService.js
-const Razorpay = require('razorpay');
-const axios = require('axios');
-const { v4: uuidv4 } = require('uuid');
+
+const Razorpay = require("razorpay");
+const axios = require("axios");
+
+/* -------------------- ENV VALIDATION -------------------- */
 
 const keyId = process.env.RAZORPAY_KEY_ID;
 const keySecret = process.env.RAZORPAY_KEY_SECRET;
-const accountNumber = process.env.RAZORPAY_ACCOUNT_NUMBER; // RazorpayX account id (string)
-const isProd = process.env.NODE_ENV === 'production';
+const accountNumber = process.env.RAZORPAY_ACCOUNT_NUMBER; // RazorpayX account number
+
+if (!keyId || !keySecret || !accountNumber) {
+  throw new Error(
+    "RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and RAZORPAY_ACCOUNT_NUMBER must be set"
+  );
+}
+
+/* -------------------- CLIENTS -------------------- */
 
 const razorpay = new Razorpay({
   key_id: keyId,
   key_secret: keySecret,
 });
 
-// REST helper for RazorpayX endpoints (payouts/contacts/fund_accounts)
+// Axios for RazorpayX APIs (contacts, fund accounts, payouts)
 const rpAxios = axios.create({
-  baseURL: 'https://api.razorpay.com/v1',
+  baseURL: "https://api.razorpay.com/v1",
   auth: {
     username: keyId,
     password: keySecret,
   },
-  timeout: 30000
+  timeout: 30000,
 });
 
-async function createOrder({ amountRupees, currency = 'INR', receipt, notes = {} }) {
-  const amountPaise = Math.round(amountRupees * 100);
+/* -------------------- ORDERS (Payments) -------------------- */
+
+async function createOrder({
+  amountPaise,
+  currency = "INR",
+  receipt,
+  notes = {},
+}) {
+  if (!Number.isInteger(amountPaise) || amountPaise <= 0) {
+    throw new Error("INVALID_ORDER_AMOUNT_PAISE");
+  }
+
   const order = await razorpay.orders.create({
     amount: amountPaise,
     currency,
     receipt,
-    notes
+    notes,
   });
+
   return order;
 }
 
 async function fetchPayment(paymentId) {
-  // GET /v1/payments/:id
   const res = await rpAxios.get(`/payments/${paymentId}`);
   return res.data;
 }
 
-// Contacts (RazorpayX)
-async function createOrGetContact({ name, email, contact, type = 'employee', reference_id }) {
+/* -------------------- RAZORPAYX: CONTACTS -------------------- */
+
+async function createOrGetContact({
+  name,
+  email,
+  contact,
+  type = "employee",
+  reference_id,
+}) {
   const payload = { name, email, contact, type };
   if (reference_id) payload.reference_id = reference_id;
 
-  const res = await rpAxios.post('/contacts', payload);
+  const res = await rpAxios.post("/contacts", payload);
   return res.data;
 }
+
+/* -------------------- RAZORPAYX: FUND ACCOUNTS -------------------- */
 
 async function createFundAccountForUPI({ contact_id, upi }) {
-  // POST /v1/fund_accounts
+  if (!contact_id || !upi) {
+    throw new Error("INVALID_FUND_ACCOUNT_INPUT");
+  }
+
   const payload = {
     contact_id,
-    account_type: 'vpa',
-    vpa: {
-      address: upi
-    }
+    account_type: "vpa",
+    vpa: { address: upi },
   };
-  const res = await rpAxios.post('/fund_accounts', payload);
+
+  const res = await rpAxios.post("/fund_accounts", payload);
   return res.data;
 }
 
-// Create Payout (composite API). Use idempotency key (mandatory).
-async function createPayout({ amountRupees, fund_account_id, narration, reference_id }) {
-  const amountPaise = Math.round(amountRupees * 100);
+/* -------------------- RAZORPAYX: PAYOUTS -------------------- */
+/**
+ * amountPaise: integer (MANDATORY)
+ * idempotencyKey: deterministic string (MANDATORY)
+ */
+async function createPayout({
+  amountPaise,
+  fund_account_id,
+  narration,
+  reference_id,
+  idempotencyKey,
+}) {
+  if (!Number.isInteger(amountPaise) || amountPaise <= 0) {
+    throw new Error("INVALID_PAYOUT_AMOUNT_PAISE");
+  }
+
+  if (!idempotencyKey) {
+    throw new Error("IDEMPOTENCY_KEY_REQUIRED");
+  }
 
   const payload = {
-    account_number: accountNumber, // business account identifier (RazorpayX)
+    account_number: accountNumber,
     fund_account_id,
     amount: amountPaise,
-    currency: 'INR',
-    mode: 'UPI',
-    purpose: 'payout',
-    narration: narration || 'Task payout',
-    reference_id: reference_id || uuidv4()
+    currency: "INR",
+    mode: "UPI",
+    purpose: "payout",
+    narration: narration || "Task payout",
+    reference_id,
   };
 
-  const idempotencyKey = uuidv4();
-  const res = await rpAxios.post('/payouts', payload, {
+  const res = await rpAxios.post("/payouts", payload, {
     headers: {
-      'Idempotency-Key': idempotencyKey
-    }
+      "Idempotency-Key": idempotencyKey,
+    },
   });
+
   return res.data;
 }
 
@@ -92,5 +138,5 @@ module.exports = {
   fetchPayment,
   createOrGetContact,
   createFundAccountForUPI,
-  createPayout
+  createPayout,
 };

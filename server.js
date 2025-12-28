@@ -21,7 +21,7 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 
 
-const startAutoPayoutJob = require('./jobs/autoPayoutJob');
+
 
 const app = express();
 
@@ -56,7 +56,7 @@ app.use('/api/payments', paymentRoutes);
 // For webhook we mount the webhook route separately so it uses express.raw
 app.use('/api/webhooks', webhookRoutes);
 // start cron job (node-cron). If deploying to Vercel, replace job with Vercel scheduled function separately.
-startAutoPayoutJob();
+
 
 app.all("*", (req, res, next) => {
   next(res.status(404).json({ message: "Route not found" }));
@@ -74,8 +74,6 @@ async function startServer() {
     await mongoose.connect(process.env.MONGODB_URL);
     console.log("✅ MongoDB connected");
 
-    // Start cron ONLY after DB is ready
-    startAutoPayoutJob();
 
     const PORT = 5000;
     app.listen(PORT, () => {

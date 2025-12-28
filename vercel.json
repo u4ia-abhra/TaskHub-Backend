@@ -14,5 +14,17 @@
   ],
   "env": {
     "NODE_ENV": "production"
+  },
+  "crons": [
+    {
+      "path": "/api/cron/autoPayout",
+      "schedule": "0 * * * *"
+    }
+  ],
+  "functions": {
+    "api/cron/autoPayout.js": {
+      "runtime": "nodejs18.x",
+      "maxDuration": 60
+    }
   }
 }
