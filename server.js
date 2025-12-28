@@ -87,8 +87,11 @@ async function startServer() {
   }
 }
 
-if (require.main === module) {
+//temp condition to prevent server from starting during Vercel deployment
+//autopayout problem
+if (process.env.VERCEL !== "1") {
   startServer();
 }
+
 
 module.exports = app;
