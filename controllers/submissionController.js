@@ -31,7 +31,7 @@ async function createSubmission(req, res) {
       });
     }
 
-    if (task.status !== "in progress") {
+    if (task.status !== "in_progress" && task.status !== "in progress") {
       return res.status(400).json({
         message: "Submissions are allowed only when task is in progress.",
       });
