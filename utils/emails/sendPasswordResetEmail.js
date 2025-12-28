@@ -5,7 +5,7 @@ async function sendPasswordResetEmail(toEmail, token) {
   const resetLink = `${process.env.RESET_PASSWORD_URL}?token=${token}`;
   try {
     const response = await resend.emails.send({
-      from: "noreply@taskhub.digital", 
+      from: "TaskHub@taskhub.digital", 
       to: toEmail,
       subject: "Reset Your TaskHub Password",
       html: `

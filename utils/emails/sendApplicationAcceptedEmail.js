@@ -11,7 +11,7 @@ async function sendApplicationAcceptedEmail({
 
   try {
     await resend.emails.send({
-      from: "noreply@taskhub.digital",
+      from: "TaskHub@taskhub.digital",
       to: freelancerEmail,
       subject: `Your application was accepted 🎉`,
       html: `

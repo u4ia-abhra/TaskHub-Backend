@@ -12,7 +12,7 @@ async function sendTaskApplicationEmail({
 
   try {
     Response=await resend.emails.send({
-      from: "noreply@taskhub.digital",
+      from: "TaskHub@taskhub.digital",
       to: uploaderEmail,
       subject: `New application for your task: ${taskTitle}`,
       html: `

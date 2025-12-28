@@ -8,7 +8,7 @@ async function sendChatClosureThankYouEmail({
 }) {
   try {
     await resend.emails.send({
-      from: "noreply@taskhub.digital",
+      from: "TaskHub@taskhub.digital",
       to: [uploaderEmail, freelancerEmail],
       subject: `Thank you for using TaskHub`,
       html: `

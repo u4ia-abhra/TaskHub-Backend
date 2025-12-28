@@ -6,7 +6,7 @@ async function sendVerificationEmail(toEmail, token) {
 
   try {
     const response = await resend.emails.send({
-      from: "noreply@taskhub.digital", 
+      from: "TaskHub@taskhub.digital", 
       to: toEmail, 
       subject: "Verify your email for TaskHub",
       html: `

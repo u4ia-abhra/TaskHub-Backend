@@ -14,6 +14,7 @@ const chatRoutes = require("./routes/chatRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const submissionRoutes = require("./routes/submissionRoutes");
+const cronRoutes = require("./routes/cronRoutes");
 
 //setup
 const dbUrl = process.env.MONGODB_URL;
@@ -59,6 +60,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/submissions", submissionRoutes);
+app.use("/api/cron", cronRoutes);
 
 app.all("*", (req, res, next) => {
   next(res.status(404).json({ message: "Route not found" }));
