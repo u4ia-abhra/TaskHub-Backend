@@ -31,12 +31,23 @@ app.use('/api/webhooks', webhookRoutes);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://task-hub-frontend-three.vercel.app",
+  "https://taskhub.digital",
+];
+
 app.use(cors({
-  origin: [
-    "http://localhost:5173",                    
-    "https://task-hub-frontend-three.vercel.app",
-    "https://taskhub.digital"
-  ]
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS not allowed"));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
 }));
 
 
@@ -54,8 +65,7 @@ app.use("/api/submissions", submissionRoutes);
 // Mount payment routes (regular JSON)
 app.use('/api/payments', paymentRoutes);
 // For webhook we mount the webhook route separately so it uses express.raw
-app.use('/api/webhooks', webhookRoutes);
-// start cron job (node-cron). If deploying to Vercel, replace job with Vercel scheduled function separately.
+
 
 
 app.all("*", (req, res, next) => {
