@@ -2,6 +2,11 @@ const Submission = require("../models/submission");
 const Task = require("../models/task");
 const { uploadFile, deleteFile } = require("../utils/cloudinaryService");
 const { payoutToFreelancer } = require("../services/payoutService");
+const sendTaskSubmissionEmail = require("../utils/emails/sendTaskSubmissionEmail");
+const sendSubmissionDecisionEmail = require("../utils/emails/sendSubmissionDecisionEmail");
+const Conversation = require("../models/conversation");
+const sendChatClosureThankYouEmail = require("../utils/emails/sendChatClosureThankYouEmail");
+const User = require("../models/user");
 
 async function createSubmission(req, res) {
   try {
@@ -9,7 +14,10 @@ async function createSubmission(req, res) {
     const { taskId } = req.params;
     const { message } = req.body;
 
-    const task = await Task.findById(taskId);
+    const task = await Task.findById(taskId).populate(
+      "uploadedBy",
+      "name email"
+    );
     if (!task) {
       return res.status(404).json({ message: "Task not found." });
     }
@@ -27,7 +35,7 @@ async function createSubmission(req, res) {
       });
     }
 
-    if (task.status !== "in progress") {
+    if (task.status !== "in_progress" && task.status !== "in progress") {
       return res.status(400).json({
         message: "Submissions are allowed only when task is in progress.",
       });
@@ -87,6 +95,27 @@ async function createSubmission(req, res) {
     task.status = "submitted";
     await task.save();
 
+    console.log("email details:", {
+      uploaderEmail: task.uploadedBy.email,
+      uploaderName: task.uploadedBy.name,
+    });
+    
+    const freelancer = await User.findById(userId).select("name");
+
+    try {
+      Response = await sendTaskSubmissionEmail({
+        uploaderEmail: task.uploadedBy.email,
+        uploaderName: task.uploadedBy.name,
+        freelancerName: freelancer.name,
+        taskTitle: task.title,
+        taskId: task._id,
+        version: submission.version,
+      });
+      console.log("Submission email sent:", Response);
+    } catch (error) {
+      console.error("Submission email failed:", error.message);
+    }
+
     res.status(201).json({
       message: `Submission v${nextVersion} created successfully.`,
       submission,
@@ -138,7 +167,9 @@ async function acceptSubmission(req, res) {
     const userId = req.user.id;
     const { id } = req.params;
 
-    const submission = await Submission.findById(id).populate("task");
+    const submission = await Submission.findById(id)
+      .populate("task")
+      .populate("freelancer", "name email");
     if (!submission) {
       return res.status(404).json({ message: "Submission not found." });
     }
@@ -164,7 +195,56 @@ async function acceptSubmission(req, res) {
 
     // 2️⃣ Mark task completed (MANDATORY before payout)
     task.status = "completed";
-    await task.save();
+    // await task.save();
+
+    // Send acceptance email to freelancer
+    try {
+      Response = await sendSubmissionDecisionEmail({
+        freelancerEmail: submission.freelancer.email,
+        freelancerName: submission.freelancer.name,
+        taskTitle: task.title,
+        taskId: task._id,
+        decision: "accepted",
+      });
+      console.log("Email send response:", Response);
+    } catch (error) {
+      console.error("Submission accepted email failed:", error.message);
+    }
+
+    // Close active chat conversation related to the task
+    try {
+      const conversation = await Conversation.findOne({
+        task: task._id,
+        status: "active",
+      }).populate("participants", "email");
+
+      if (conversation) {
+        conversation.status = "closed";
+        await conversation.save();
+
+        const uploader = conversation.participants.find(
+          (p) => p._id.toString() === task.uploadedBy.toString()
+        );
+
+        const freelancer = conversation.participants.find(
+          (p) => p._id.toString() !== task.uploadedBy.toString()
+        );
+
+        if (uploader && freelancer) {
+          try {
+            await sendChatClosureThankYouEmail({
+              uploaderEmail: uploader.email,
+              freelancerEmail: freelancer.email,
+              taskTitle: task.title,
+            });
+          } catch (emailErr) {
+            console.error("Chat closure email failed:", emailErr.message);
+          }
+        }
+      }
+    } catch (chatErr) {
+      console.error("Chat closure failed:", chatErr.message);
+    }
 
     // 3️⃣ 🔥 TRIGGER PAYOUT (ONLY PLACE)
     try {
@@ -201,7 +281,9 @@ async function requestRevision(req, res) {
     const { id } = req.params;
     const { message } = req.body;
 
-    const submission = await Submission.findById(id).populate("task");
+    const submission = await Submission.findById(id)
+      .populate("task")
+      .populate("freelancer", "name email");
     if (!submission) {
       return res.status(404).json({ message: "Submission not found." });
     }
@@ -248,6 +330,19 @@ async function requestRevision(req, res) {
 
     await submission.save();
     await task.save();
+
+    try {
+      await sendSubmissionDecisionEmail({
+        freelancerEmail: submission.freelancer.email,
+        freelancerName: submission.freelancer.name,
+        taskTitle: task.title,
+        taskId: task._id,
+        decision: "revision_requested",
+        revisionMessage: submission.revisionMessage,
+      });
+    } catch (error) {
+      console.error("Revision request email failed:", error.message);
+    }
 
     res.status(200).json({
       message: "Revision requested successfully.",

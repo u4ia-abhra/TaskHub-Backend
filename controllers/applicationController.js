@@ -1,6 +1,9 @@
 const Application = require("../models/application");
 const Task = require("../models/task");
 const Conversation = require("../models/conversation");
+const sendTaskApplicationEmail = require("../utils/emails/sendTaskApplicationEmail");
+const sendApplicationAcceptedEmail = require("../utils/emails/sendApplicationAcceptedEmail");
+const User = require("../models/user");
 
 async function applyForTask(req, res) {
   try {
@@ -15,7 +18,10 @@ async function applyForTask(req, res) {
       });
     }
 
-    const task = await Task.findById(taskId);
+    const task = await Task.findById(taskId).populate(
+      "uploadedBy",
+      "name email"
+    );
     if (!task) {
       return res.status(404).json({ message: "Task not found." });
     }
@@ -52,6 +58,29 @@ async function applyForTask(req, res) {
 
     await application.save();
 
+    const freelancer = await User.findById(userId).select("name");
+
+    // Send notification email to task uploader
+    try {
+      console.log("Sending task application email...");
+      console.log("Task details:", {
+        uploaderEmail: task.uploadedBy.email,
+        uploaderName: task.uploadedBy.name,
+        taskTitle: task.title,
+        freelancerName: freelancer.name,
+        taskId: task._id,
+      });
+      await sendTaskApplicationEmail({
+        uploaderEmail: task.uploadedBy.email,
+        uploaderName: task.uploadedBy.name,
+        taskTitle: task.title,
+        freelancerName: freelancer.name,
+        taskId: task._id,
+      });
+    } catch (error) {
+      console.error("Task application email failed:", error.message);
+    }
+
     res.status(201).json({ message: "Application submitted successfully." });
   } catch (error) {
     console.error("Error applying for task:", error);
@@ -71,11 +100,9 @@ async function getApplicationsForTask(req, res) {
     }
 
     if (task.uploadedBy.toString() !== userId) {
-      return res
-        .status(403)
-        .json({
-          message: "You are not authorized to view applications for this task.",
-        });
+      return res.status(403).json({
+        message: "You are not authorized to view applications for this task.",
+      });
     }
 
     const applications = await Application.find({ task: taskId })
@@ -98,7 +125,7 @@ async function acceptApplication(req, res) {
     const userId = req.user.id;
 
     const application =
-      await Application.findById(applicationId).populate("task");
+      await Application.findById(applicationId).populate("task").populate("applicant", "name email");
     if (!application) {
       return res.status(404).json({ message: "Application not found." });
     }
@@ -110,12 +137,9 @@ async function acceptApplication(req, res) {
     }
 
     if (task.uploadedBy.toString() !== userId) {
-      return res
-        .status(403)
-        .json({
-          message:
-            "You are not authorized to accept applications for this task.",
-        });
+      return res.status(403).json({
+        message: "You are not authorized to accept applications for this task.",
+      });
     }
 
     if (task.status !== "open") {
@@ -148,7 +172,20 @@ async function acceptApplication(req, res) {
     task.status = "in progress";
     task.assignedTo = application.applicant;
     await task.save();
-    
+
+    // Send email to applicant about acceptance
+    try {
+      Response=await sendApplicationAcceptedEmail({
+        freelancerEmail: application.applicant.email,
+        freelancerName: application.applicant.name,
+        taskTitle: task.title,
+        taskId: task._id,
+      });
+      console.log("Email send response:", Response);
+    } catch (error) {
+      console.error("Application accepted email failed:", error.message);
+    }
+
     // Create a conversation between task uploader and applicant
     const existingConv = await Conversation.findOne({
       task: task._id,
@@ -193,12 +230,9 @@ async function rejectApplication(req, res) {
     }
 
     if (task.uploadedBy.toString() !== userId) {
-      return res
-        .status(403)
-        .json({
-          message:
-            "You are not authorized to reject applications for this task.",
-        });
+      return res.status(403).json({
+        message: "You are not authorized to reject applications for this task.",
+      });
     }
 
     if (task.status !== "open") {
@@ -256,11 +290,9 @@ async function withdrawApplication(req, res) {
     }
 
     if (application.applicant.toString() !== userId) {
-      return res
-        .status(403)
-        .json({
-          message: "You are not authorized to withdraw this application.",
-        });
+      return res.status(403).json({
+        message: "You are not authorized to withdraw this application.",
+      });
     }
 
     const task = application.task;
@@ -269,12 +301,10 @@ async function withdrawApplication(req, res) {
     }
 
     if (task.status !== "open") {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Cannot withdraw application for a task that is no longer open.",
-        });
+      return res.status(400).json({
+        message:
+          "Cannot withdraw application for a task that is no longer open.",
+      });
     }
 
     if (application.status !== "pending") {

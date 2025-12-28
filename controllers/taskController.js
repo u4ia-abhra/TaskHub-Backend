@@ -99,6 +99,7 @@ async function viewTasks(req, res) {
 
     const tasks = await Task.find(query)
       .populate("uploadedBy", "name email")
+      .populate("assignedTo", "name email")
       .sort(sortOption)
       .skip(skip)
       .limit(parseInt(limit));

@@ -16,10 +16,14 @@ const chatRoutes = require("./routes/chatRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const submissionRoutes = require("./routes/submissionRoutes");
+<<<<<<< HEAD
 const paymentRoutes = require('./routes/paymentRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const startAutoPayoutJob = require('./jobs/autoPayoutJob');
 
+=======
+const cronRoutes = require("./routes/cronRoutes");
+>>>>>>> d257f888a28129766cc416b5985e3b8f03df7446
 
 //setup
 const dbUrl = process.env.MONGODB_URL;
@@ -54,7 +58,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors({
   origin: [
     "http://localhost:5173",                    
-    "https://task-hub-frontend-three.vercel.app" 
+    "https://task-hub-frontend-three.vercel.app",
+    "https://taskhub.digital"
   ]
 }));
 
@@ -72,6 +77,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/submissions", submissionRoutes);
+app.use("/api/cron", cronRoutes);
 
 // Mount payment routes (regular JSON)
 app.use('/api/payments', paymentRoutes);

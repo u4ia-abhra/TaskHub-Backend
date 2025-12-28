@@ -1,9 +1,9 @@
 const User = require("../models/user");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const sendVerificationEmail = require("../utils/sendVerificationEmail");
+const sendVerificationEmail = require("../utils/emails/sendVerificationEmail");
 const crypto = require("crypto");
-const sendPasswordResetEmail = require("../utils/sendPasswordResetEmail");
+const sendPasswordResetEmail = require("../utils/emails/sendPasswordResetEmail");
 
 const emailRegex = /^[0-9]{7,8}@kiit\.ac\.in$/;
 
