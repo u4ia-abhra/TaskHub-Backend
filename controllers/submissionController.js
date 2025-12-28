@@ -3,6 +3,8 @@ const Task = require("../models/task");
 const { uploadFile, deleteFile } = require("../utils/cloudinaryService");
 const sendTaskSubmissionEmail = require("../utils/emails/sendTaskSubmissionEmail");
 const sendSubmissionDecisionEmail = require("../utils/emails/sendSubmissionDecisionEmail");
+const Conversation = require("../models/conversation");
+const sendChatClosureThankYouEmail = require("../utils/emails/sendChatClosureThankYouEmail");
 
 async function createSubmission(req, res) {
   try {
@@ -180,8 +182,9 @@ async function acceptSubmission(req, res) {
     await submission.save();
 
     task.status = "completed";
-    await task.save();
+    // await task.save();
 
+    // Send acceptance email to freelancer
     try {
       Response = await sendSubmissionDecisionEmail({
         freelancerEmail: submission.freelancer.email,
@@ -193,6 +196,41 @@ async function acceptSubmission(req, res) {
       console.log("Email send response:", Response);
     } catch (error) {
       console.error("Submission accepted email failed:", error.message);
+    }
+
+    // Close active chat conversation related to the task
+    try {
+      const conversation = await Conversation.findOne({
+        task: task._id,
+        status: "active",
+      }).populate("participants", "email");
+
+      if (conversation) {
+        conversation.status = "closed";
+        await conversation.save();
+
+        const uploader = conversation.participants.find(
+          (p) => p._id.toString() === task.uploadedBy.toString()
+        );
+
+        const freelancer = conversation.participants.find(
+          (p) => p._id.toString() !== task.uploadedBy.toString()
+        );
+
+        if (uploader && freelancer) {
+          try {
+            await sendChatClosureThankYouEmail({
+              uploaderEmail: uploader.email,
+              freelancerEmail: freelancer.email,
+              taskTitle: task.title,
+            });
+          } catch (emailErr) {
+            console.error("Chat closure email failed:", emailErr.message);
+          }
+        }
+      }
+    } catch (chatErr) {
+      console.error("Chat closure failed:", chatErr.message);
     }
 
     res.status(200).json({
@@ -213,10 +251,9 @@ async function requestRevision(req, res) {
     const { id } = req.params;
     const { message } = req.body;
 
-    const submission = await Submission.findById(id).populate("task").populate(
-      "freelancer",
-      "name email"
-    );
+    const submission = await Submission.findById(id)
+      .populate("task")
+      .populate("freelancer", "name email");
     if (!submission) {
       return res.status(404).json({ message: "Submission not found." });
     }
