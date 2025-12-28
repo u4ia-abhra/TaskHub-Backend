@@ -33,6 +33,40 @@ const attachmentSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const paymentSchema = new mongoose.Schema(
+  {
+    orderId: { type: String },
+    paymentId: { type: String },
+    amount: { type: Number },
+    razorpayFee: { type: Number },
+    platformFeePercent: { type: Number },
+    platformFeeAmount: { type: Number },
+    netPayoutAmount: { type: Number },
+    paidAt: { type: Date },
+    chatEnabled: { type: Boolean, default: false },
+    pendingAssignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    payoutId: { type: String },
+    payoutDone: { type: Boolean, default: false },
+    payoutInProgress: { type: Boolean, default: false },
+
+    // NEW FIELDS for retry mechanism
+    payoutRetries: {
+      type: Number,
+      default: 0,
+    },
+    payoutLastError: {
+      type: String,
+    },
+    payoutLastAttemptAt: {
+      type: Date,
+    },
+  },
+  { _id: false }
+);
+
 const taskSchema = new mongoose.Schema(
   {
     title: {
@@ -95,6 +129,11 @@ const taskSchema = new mongoose.Schema(
       type: Number,
       default: 3,
     },
+    payment: paymentSchema,
+
+    // to track submissions timestamps for auto-payout logic
+    firstSubmissionAt: Date,
+    revisionCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
