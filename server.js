@@ -43,7 +43,7 @@ app.use(cors({
     "https://www.taskhub.digital",   
     "http://localhost:5173"         
   ],
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH" , "DELETE", "OPTIONS"],
   credentials: true
 }));
 
