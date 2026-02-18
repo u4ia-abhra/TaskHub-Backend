@@ -20,7 +20,7 @@ async function applyForTask(req, res) {
 
     const task = await Task.findById(taskId).populate(
       "uploadedBy",
-      "name email"
+      "name email",
     );
     if (!task) {
       return res.status(404).json({ message: "Task not found." });
@@ -30,6 +30,13 @@ async function applyForTask(req, res) {
       return res
         .status(400)
         .json({ message: "Applications are closed for this task." });
+    }
+
+    if (task.deadline <= new Date()) {
+      return res.status(400).json({
+        message:
+          "Task deadline has passed. Applications are closed for this task.",
+      });
     }
 
     if (task.uploadedBy._id.toString() === userId) {
@@ -124,8 +131,9 @@ async function acceptApplication(req, res) {
     const applicationId = req.params.applicationId;
     const userId = req.user.id;
 
-    const application =
-      await Application.findById(applicationId).populate("task").populate("applicant", "name email");
+    const application = await Application.findById(applicationId)
+      .populate("task")
+      .populate("applicant", "name email");
     if (!application) {
       return res.status(404).json({ message: "Application not found." });
     }
@@ -148,6 +156,13 @@ async function acceptApplication(req, res) {
         .json({ message: "Cannot accept applications for a non-open task." });
     }
 
+    if (task.deadline <= new Date()) {
+      return res.status(400).json({
+        message:
+          "Cannot accept application because the task deadline has passed.",
+      });
+    }
+
     if (application.status !== "pending") {
       return res
         .status(400)
@@ -165,7 +180,7 @@ async function acceptApplication(req, res) {
         _id: { $ne: application._id },
         status: "pending",
       },
-      { $set: { status: "rejected" } }
+      { $set: { status: "rejected" } },
     );
 
     // Update task status to "in progress"
@@ -175,7 +190,7 @@ async function acceptApplication(req, res) {
 
     // Send email to applicant about acceptance
     try {
-      Response=await sendApplicationAcceptedEmail({
+      Response = await sendApplicationAcceptedEmail({
         freelancerEmail: application.applicant.email,
         freelancerName: application.applicant.name,
         taskTitle: task.title,
