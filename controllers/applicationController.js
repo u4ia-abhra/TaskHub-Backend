@@ -4,9 +4,12 @@ const Conversation = require("../models/conversation");
 const sendTaskApplicationEmail = require("../utils/emails/sendTaskApplicationEmail");
 const sendApplicationAcceptedEmail = require("../utils/emails/sendApplicationAcceptedEmail");
 const User = require("../models/user");
+const expireOpenTasks = require("../utils/expireTasks");
 
 async function applyForTask(req, res) {
   try {
+    await expireOpenTasks();
+
     const taskId = req.params.id;
     const userId = req.user.id;
     const { coverLetter, bidAmount, estimatedTime } = req.body;
@@ -97,6 +100,8 @@ async function applyForTask(req, res) {
 
 async function getApplicationsForTask(req, res) {
   try {
+    await expireOpenTasks();
+
     const taskId = req.params.taskId;
     const userId = req.user.id;
 
@@ -128,6 +133,8 @@ async function getApplicationsForTask(req, res) {
 
 async function acceptApplication(req, res) {
   try {
+    await expireOpenTasks();
+
     const applicationId = req.params.applicationId;
     const userId = req.user.id;
 
@@ -229,6 +236,8 @@ async function acceptApplication(req, res) {
 
 async function rejectApplication(req, res) {
   try {
+    await expireOpenTasks();
+
     const applicationId = req.params.applicationId;
     const userId = req.user.id;
 
@@ -295,6 +304,8 @@ async function getMyApplications(req, res) {
 
 async function withdrawApplication(req, res) {
   try {
+    await expireOpenTasks();
+
     const applicationId = req.params.applicationId;
     const userId = req.user.id;
 

@@ -1,5 +1,7 @@
 const Task = require("../models/task");
 const { deleteFile } = require("../utils/cloudinaryService");
+const expireOpenTasks = require("../utils/expireTasks");
+
 
 async function uploadTask(req, res) {
   try {
@@ -63,6 +65,8 @@ async function uploadTask(req, res) {
 
 async function viewTasks(req, res) {
   try {
+    await expireOpenTasks();
+
     const {
       page = 1,
       limit = 10,
@@ -123,6 +127,8 @@ async function viewTasks(req, res) {
 
 async function getTaskById(req, res) {
   try {
+    await expireOpenTasks();
+
     const taskId = req.params.id;
 
     // Validate taskId format
@@ -152,6 +158,8 @@ async function getTaskById(req, res) {
 
 async function getMyTasks(req, res) {
   try {
+    await expireOpenTasks();
+
     const userId = req.user.id;
     const tasks = await Task.find({ uploadedBy: userId }).sort({
       createdAt: -1,
