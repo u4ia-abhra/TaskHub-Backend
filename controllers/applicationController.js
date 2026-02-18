@@ -4,9 +4,12 @@ const Conversation = require("../models/conversation");
 const sendTaskApplicationEmail = require("../utils/emails/sendTaskApplicationEmail");
 const sendApplicationAcceptedEmail = require("../utils/emails/sendApplicationAcceptedEmail");
 const User = require("../models/user");
+const expireOpenTasks = require("../utils/expireTasks");
 
 async function applyForTask(req, res) {
   try {
+    await expireOpenTasks();
+
     const taskId = req.params.id;
     const userId = req.user.id;
     const { coverLetter, bidAmount, estimatedTime } = req.body;
@@ -20,7 +23,7 @@ async function applyForTask(req, res) {
 
     const task = await Task.findById(taskId).populate(
       "uploadedBy",
-      "name email"
+      "name email",
     );
     if (!task) {
       return res.status(404).json({ message: "Task not found." });
@@ -30,6 +33,13 @@ async function applyForTask(req, res) {
       return res
         .status(400)
         .json({ message: "Applications are closed for this task." });
+    }
+
+    if (task.deadline <= new Date()) {
+      return res.status(400).json({
+        message:
+          "Task deadline has passed. Applications are closed for this task.",
+      });
     }
 
     if (task.uploadedBy._id.toString() === userId) {
@@ -90,6 +100,8 @@ async function applyForTask(req, res) {
 
 async function getApplicationsForTask(req, res) {
   try {
+    await expireOpenTasks();
+
     const taskId = req.params.taskId;
     const userId = req.user.id;
 
@@ -121,11 +133,14 @@ async function getApplicationsForTask(req, res) {
 
 async function acceptApplication(req, res) {
   try {
+    await expireOpenTasks();
+
     const applicationId = req.params.applicationId;
     const userId = req.user.id;
 
-    const application =
-      await Application.findById(applicationId).populate("task").populate("applicant", "name email");
+    const application = await Application.findById(applicationId)
+      .populate("task")
+      .populate("applicant", "name email");
     if (!application) {
       return res.status(404).json({ message: "Application not found." });
     }
@@ -148,6 +163,13 @@ async function acceptApplication(req, res) {
         .json({ message: "Cannot accept applications for a non-open task." });
     }
 
+    if (task.deadline <= new Date()) {
+      return res.status(400).json({
+        message:
+          "Cannot accept application because the task deadline has passed.",
+      });
+    }
+
     if (application.status !== "pending") {
       return res
         .status(400)
@@ -165,7 +187,7 @@ async function acceptApplication(req, res) {
         _id: { $ne: application._id },
         status: "pending",
       },
-      { $set: { status: "rejected" } }
+      { $set: { status: "rejected" } },
     );
 
     // Update task status to "in progress"
@@ -175,7 +197,7 @@ async function acceptApplication(req, res) {
 
     // Send email to applicant about acceptance
     try {
-      Response=await sendApplicationAcceptedEmail({
+      Response = await sendApplicationAcceptedEmail({
         freelancerEmail: application.applicant.email,
         freelancerName: application.applicant.name,
         taskTitle: task.title,
@@ -214,6 +236,8 @@ async function acceptApplication(req, res) {
 
 async function rejectApplication(req, res) {
   try {
+    await expireOpenTasks();
+
     const applicationId = req.params.applicationId;
     const userId = req.user.id;
 
@@ -280,6 +304,8 @@ async function getMyApplications(req, res) {
 
 async function withdrawApplication(req, res) {
   try {
+    await expireOpenTasks();
+
     const applicationId = req.params.applicationId;
     const userId = req.user.id;
 

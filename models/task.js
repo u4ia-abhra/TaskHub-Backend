@@ -30,7 +30,7 @@ const attachmentSchema = new mongoose.Schema(
       default: Date.now,
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const taskSchema = new mongoose.Schema(
@@ -75,7 +75,14 @@ const taskSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["open", "in progress", "completed", "submitted", "revision_limit_reached"],
+      enum: [
+        "open",
+        "in progress",
+        "completed",
+        "submitted",
+        "revision_limit_reached",
+        "expired",
+      ],
       default: "open",
     },
     uploadedBy: {
@@ -96,7 +103,7 @@ const taskSchema = new mongoose.Schema(
       default: 3,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const Task = mongoose.model("Task", taskSchema);
